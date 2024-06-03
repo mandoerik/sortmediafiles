@@ -11,10 +11,6 @@ If filename already exist in destination it moves the file but renames it with _
 
 File Sorting: Moves each media file from the source directory to its corresponding year/month folder in the destination directory.
 
-Logging: Logs the operations performed and provides a summary report at the end.
-
-This playbook is useful for organizing media collections, making it easier to manage and locate files based on their creation or modification dates.
-
 ## How to run...
 ```bash
 ansible-playbook sortmediafiles.yml --extra-vars "src_dir= dest_dir="
