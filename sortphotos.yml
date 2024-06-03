@@ -1,0 +1,92 @@
+---
+- name: Organize photos and videos by date taken
+  hosts: localhost
+  gather_facts: no
+  vars:
+    src_dir: "{{ src_dir | default('/path/to/photos') }}"
+    dest_dir: "{{ dest_dir | default('/path/to/organized_photos') }}"
+    date_tag: "-datetimeoriginal"
+    video_date_tags: ["-CreateDate", "-MediaCreateDate", "-TrackCreateDate", "-FileModifyDate"]
+
+  tasks:
+    - name: Debug source directory
+      debug:
+        msg: "Source directory: {{ src_dir }}"
+
+    - name: Debug destination directory
+      debug:
+        msg: "Destination directory: {{ dest_dir }}"
+
+    - name: Find all media files recursively
+      find:
+        paths: "{{ src_dir }}"
+        recurse: yes
+        patterns: '.*\.(jpg|JPG|jpeg|png|gif|bmp|mp4|mov|MOV|avi|3gp)$'
+        use_regex: true
+      register: found_files
+
+    - name: Debug found files
+      debug:
+        var: found_files.files
+
+    - name: Ensure target directory exists
+      file:
+        path: "{{ dest_dir }}"
+        state: directory
+
+    - name: Get photo dates and move them with renaming if necessary
+      shell: |
+        DATE=$(exiftool -d '%Y/%B' '{{ date_tag }}' -s3 "{{ item.path }}")
+        if [ -z "$DATE" ]; then
+          DATE=$(date -r "{{ item.path }}" +"%Y/%B")
+        fi
+        BASENAME=$(basename "{{ item.path }}")
+        DEST="{{ dest_dir }}/$DATE/$BASENAME"
+        echo "Moving {{ item.path }} to $DEST"
+        mkdir -p "{{ dest_dir }}/$DATE"
+        COUNTER=1
+        while [ -e "$DEST" ]; do
+          DEST="{{ dest_dir }}/$DATE/${BASENAME%.*}_$COUNTER.${BASENAME##*.}"
+          COUNTER=$((COUNTER + 1))
+        done
+        mv "{{ item.path }}" "$DEST"
+      loop: "{{ found_files.files }}"
+      when: item.path | regex_search('.*\.(jpg|JPG|jpeg|png|gif|bmp)$')
+      register: organize_output_photos
+
+    - name: Debug move output for photos
+      debug:
+        var: organize_output_photos.results
+      when: found_files.matched > 0
+
+    - name: Get video dates and move them with renaming if necessary
+      shell: |
+        DATE=""
+        for TAG in {{ video_date_tags | join(' ') }}; do
+          DATE=$(exiftool -d '%Y/%B' "$TAG" -s3 "{{ item.path }}")
+          if [ -n "$DATE" ]; then
+            break
+          fi
+        done
+        if [ -z "$DATE" ]; then
+          DATE=$(date -r "{{ item.path }}" +"%Y/%B")
+        fi
+        BASENAME=$(basename "{{ item.path }}")
+        DEST="{{ dest_dir }}/$DATE/$BASENAME"
+        echo "Moving {{ item.path }} to $DEST"
+        mkdir -p "{{ dest_dir }}/$DATE"
+        COUNTER=1
+        while [ -e "$DEST" ]; do
+          DEST="{{ dest_dir }}/$DATE/${BASENAME%.*}_$COUNTER.${BASENAME##*.}"
+          COUNTER=$((COUNTER + 1))
+        done
+        mv "{{ item.path }}" "$DEST"
+      loop: "{{ found_files.files }}"
+      when: item.path | regex_search('.*\.(mp4|mov|MOV|avi|3gp)$')
+      register: organize_output_videos
+
+    - name: Debug move output for videos
+      debug:
+        var: organize_output_videos.results
+      when: found_files.matched > 0
+
