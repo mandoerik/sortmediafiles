@@ -89,4 +89,3 @@
       debug:
         var: organize_output_videos.results
       when: found_files.matched > 0
-
