@@ -21,7 +21,7 @@
       find:
         paths: "{{ src_dir }}"
         recurse: yes
-        patterns: '.*\.(jpg|JPG|jpeg|png|gif|bmp|mp4|mov|MOV|avi|3gp)$'
+        patterns: '.*\.(jpg|tif|TIF|CR2|JPG|jpeg|png|gif|bmp|mp4|mov|MOV|avi|3gp|AVI|wmv|MP4)$'
         use_regex: true
       register: found_files
 
@@ -34,9 +34,9 @@
         path: "{{ dest_dir }}"
         state: directory
 
-    - name: Get photo dates and move them with renaming if necessary
+    - name: Process photos
       shell: |
-        DATE=$(exiftool -d '%Y/%B' '{{ date_tag }}' -s3 "{{ item.path }}")
+        DATE=$(exiftool -d '%Y/%B' '{{ date_tag }}' -s3 "{{ item.path }}" | tr -d '\r\n')
         if [ -z "$DATE" ]; then
           DATE=$(date -r "{{ item.path }}" +"%Y/%B")
         fi
@@ -51,7 +51,7 @@
         done
         mv "{{ item.path }}" "$DEST"
       loop: "{{ found_files.files }}"
-      when: item.path | regex_search('.*\.(jpg|JPG|jpeg|png|gif|bmp)$')
+      when: item.path | regex_search('.*\.(jpg|JPG|jpeg|png|gif|bmp|tif|TIF|CR2)$')
       register: organize_output_photos
 
     - name: Debug move output for photos
@@ -59,11 +59,11 @@
         var: organize_output_photos.results
       when: found_files.matched > 0
 
-    - name: Get video dates and move them with renaming if necessary
+    - name: Process videos
       shell: |
         DATE=""
         for TAG in {{ video_date_tags | join(' ') }}; do
-          DATE=$(exiftool -d '%Y/%B' "$TAG" -s3 "{{ item.path }}")
+          DATE=$(exiftool -d '%Y/%B' "$TAG" -s3 "{{ item.path }}" | tr -d '\r\n')
           if [ -n "$DATE" ]; then
             break
           fi
@@ -82,7 +82,7 @@
         done
         mv "{{ item.path }}" "$DEST"
       loop: "{{ found_files.files }}"
-      when: item.path | regex_search('.*\.(mp4|mov|MOV|avi|3gp)$')
+      when: item.path | regex_search('.*\.(mp4|mov|MOV|avi|3gp|AVI|wmv|MP4)$')
       register: organize_output_videos
 
     - name: Debug move output for videos
